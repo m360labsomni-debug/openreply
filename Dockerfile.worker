@@ -1,0 +1,21 @@
+# Worker container for OpenReply (self-hosted)
+# Pins Node 24 because Prisma 7.x requires Node 20.19+, 22.12+, or 24+.
+FROM node:24-slim
+
+WORKDIR /app
+
+# Prisma needs openssl at runtime
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+
+# Generate the Prisma client against the schema in the repo
+RUN npx prisma generate
+
+# Run the background DM worker (not the Next.js web server)
+CMD ["npm", "run", "worker"]
