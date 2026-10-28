@@ -174,6 +174,9 @@ model Automation {
   goal           String?
   postId         String?
   postUrl        String?
+  // Every post/reel this campaign listens on. postId/postUrl mirror the
+  // first entry so single-post code paths (thumbnails, reports) keep working.
+  postIds        String[] @default([])
   pendingNextReel Boolean @default(false)
   matchAnyPost   Boolean @default(false)
   keywords       String[]
@@ -215,6 +218,7 @@ model Automation {
   @@index([workspaceId])
   @@index([instagramAccountId])
   @@index([postId])
+  @@index([postIds], type: Gin)
 }
 
 model DmLog {

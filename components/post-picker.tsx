@@ -5,7 +5,8 @@
 /**
  * Post Picker
  *
- * Grid of Instagram post thumbnails, selectable.
+ * Grid of Instagram post thumbnails. Click to add or remove a post — a
+ * campaign can listen on several posts/reels at once.
  * Fetches from /api/instagram/posts.
  */
 
@@ -23,11 +24,12 @@ interface InstagramPost {
 }
 
 interface PostPickerProps {
-  selectedPostId: string | null;
+  selectedPostIds: string[];
   instagramAccountId?: string | null;
   /** postId -> name of the campaign already using it. Flagged in the grid. */
   usedPostIds?: Record<string, string>;
-  onSelect: (
+  /** Toggles a post in or out of the selection. */
+  onToggle: (
     postId: string,
     postUrl?: string,
     thumbUrl?: string,
@@ -36,10 +38,10 @@ interface PostPickerProps {
 }
 
 export default function PostPicker({
-  selectedPostId,
+  selectedPostIds,
   instagramAccountId,
   usedPostIds,
-  onSelect,
+  onToggle,
 }: PostPickerProps) {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,8 +136,15 @@ export default function PostPicker({
           placeholder="Search your posts by caption…"
           className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none"
         />
-        <span className="shrink-0 text-xs text-muted">{posts.length}</span>
+        <span className="shrink-0 text-xs text-muted">
+          {selectedPostIds.length > 0
+            ? `${selectedPostIds.length}/${posts.length}`
+            : posts.length}
+        </span>
       </div>
+      <p className="px-1 text-[11px] text-muted">
+        Tap to select one or more posts. Tap again to remove.
+      </p>
       {visible.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted">
           No posts match &ldquo;{query}&rdquo;
@@ -150,7 +159,7 @@ export default function PostPicker({
           )}
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-64 overflow-y-auto p-1">
             {visible.map((post) => {
-              const isSelected = selectedPostId === post.id;
+              const isSelected = selectedPostIds.includes(post.id);
               const usedByName = usedPostIds?.[post.id];
               const isUsed = Boolean(usedByName) && !isSelected;
               const thumb = post.thumbnail_url ?? post.media_url;
@@ -161,7 +170,7 @@ export default function PostPicker({
           <button
             key={post.id}
             type="button"
-            onClick={() => onSelect(post.id, post.permalink, thumb, post.caption)}
+            onClick={() => onToggle(post.id, post.permalink, thumb, post.caption)}
             onMouseEnter={() => setHoveredId(post.id)}
             onMouseLeave={() =>
               setHoveredId((cur) => (cur === post.id ? null : cur))

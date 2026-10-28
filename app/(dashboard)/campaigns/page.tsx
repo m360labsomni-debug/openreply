@@ -17,6 +17,7 @@ interface Campaign {
   name: string;
   goal: string | null;
   postId: string | null;
+  postIds?: string[];
   postUrl: string | null;
   pendingNextReel: boolean;
   matchAnyPost: boolean;
@@ -248,6 +249,7 @@ export default function CampaignsPage() {
           name: `${auto.name} copy`,
           instagramAccountId: auto.instagramAccountId,
           postId: specific ? auto.postId : null,
+          postIds: specific ? (auto.postIds ?? []) : [],
           postUrl: specific ? auto.postUrl : null,
           matchAnyPost: auto.matchAnyPost,
           pendingNextReel: auto.pendingNextReel,
@@ -455,6 +457,11 @@ export default function CampaignsPage() {
                   >
                     {auto.isActive ? "Active" : "Paused"}
                   </span>
+                  {(auto.postIds?.length ?? 0) > 1 && (
+                    <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
+                      {auto.postIds?.length} posts
+                    </span>
+                  )}
                   {auto.pendingNextReel && (
                     <span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-warning">
                       Waiting for next reel

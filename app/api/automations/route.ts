@@ -15,6 +15,15 @@ import {
 // immediately), so never cache it at the route or CDN layer.
 export const dynamic = "force-dynamic";
 
+/** Selected posts, de-duplicated, in order, falling back to a single postId. */
+function uniquePostIds(
+  postIds: string[] | undefined,
+  postId: string | null | undefined
+): string[] {
+  const list = postIds && postIds.length > 0 ? postIds : postId ? [postId] : [];
+  return Array.from(new Set(list.map((id) => id.trim()).filter(Boolean)));
+}
+
 const createAutomationSchema = z
   .object({
     name: z.string().min(1).max(100),
@@ -22,6 +31,8 @@ const createAutomationSchema = z
     instagramAccountId: z.string().min(1).optional().nullable(),
     postId: z.string().min(1).optional().nullable(),
     postUrl: z.string().url().optional().nullable(),
+    // Several posts/reels for one campaign. When present it wins over postId.
+    postIds: z.array(z.string().min(1)).max(100).optional(),
     pendingNextReel: z.boolean().optional().default(false),
     matchAnyPost: z.boolean().optional().default(false),
     keywords: z.array(z.string().min(1).max(50)).max(10).optional().default([]),
@@ -63,7 +74,11 @@ const createAutomationSchema = z
   })
   // A campaign must target a specific post, any post, or the next reel.
   .refine(
-    (d) => d.matchAnyPost || d.pendingNextReel || Boolean(d.postId),
+    (d) =>
+      d.matchAnyPost ||
+      d.pendingNextReel ||
+      Boolean(d.postId) ||
+      (d.postIds?.length ?? 0) > 0,
     { message: "Choose which post(s) trigger the campaign", path: ["postId"] }
   )
   // And it must match either specific words or any word.
@@ -85,6 +100,7 @@ const updateAutomationSchema = z.object({
   goal: z.string().min(1).max(120).optional().nullable(),
   postId: z.string().min(1).optional().nullable(),
   postUrl: z.string().url().optional().nullable(),
+  postIds: z.array(z.string().min(1)).max(100).optional(),
   pendingNextReel: z.boolean().optional(),
   matchAnyPost: z.boolean().optional(),
   keywords: z.array(z.string().min(1).max(50)).max(10).optional(),
@@ -373,6 +389,9 @@ export async function POST(request: NextRequest) {
     parsed.data;
   // A post is only stored for the "specific post" trigger.
   const isSpecificPost = !pendingNextReel && !matchAnyPost;
+  const specificPostIds = isSpecificPost
+    ? uniquePostIds(parsed.data.postIds, parsed.data.postId)
+    : [];
   const publicReplyList = (
     parsed.data.publicReplyMessages.length > 0
       ? parsed.data.publicReplyMessages
@@ -388,7 +407,8 @@ export async function POST(request: NextRequest) {
       name: parsed.data.name,
       goal: parsed.data.goal,
       // A next-reel campaign has no post yet; the cron binds it once a reel is posted.
-      postId: isSpecificPost ? parsed.data.postId : null,
+      postId: specificPostIds[0] ?? null,
+      postIds: specificPostIds,
       postUrl: isSpecificPost ? parsed.data.postUrl : null,
       pendingNextReel,
       matchAnyPost,
@@ -522,6 +542,16 @@ export async function PATCH(request: NextRequest) {
   if (automationData.matchAnyPost === true || automationData.pendingNextReel === true) {
     automationData.postId = null;
     automationData.postUrl = null;
+    automationData.postIds = [];
+  } else if (automationData.postIds !== undefined) {
+    // A new post list: the first one is the campaign's primary post.
+    const ids = uniquePostIds(automationData.postIds, null);
+    automationData.postIds = ids;
+    automationData.postId = ids[0] ?? null;
+    if (ids.length === 0) automationData.postUrl = null;
+  } else if (automationData.postId !== undefined) {
+    // Older clients still send a single post.
+    automationData.postIds = automationData.postId ? [automationData.postId] : [];
   }
   // Keep the public-reply variations list and the legacy single field in sync.
   if (automationData.publicReplyMessages !== undefined) {

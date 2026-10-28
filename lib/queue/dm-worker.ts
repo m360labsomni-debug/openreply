@@ -201,8 +201,14 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
 
   const automations = await prisma.automation.findMany({
     where: {
-      // Match campaigns bound to this specific post, plus any-post campaigns.
-      OR: [{ postId: mediaId }, { matchAnyPost: true }],
+      // Match campaigns that include this post (one or several), plus
+      // any-post campaigns. postId is kept for campaigns saved before
+      // multi-post support.
+      OR: [
+        { postIds: { has: mediaId } },
+        { postId: mediaId },
+        { matchAnyPost: true },
+      ],
       isActive: true,
       instagramAccount: {
         instagramId: instagramAccountId,

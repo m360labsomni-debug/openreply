@@ -17,6 +17,7 @@ interface Campaign {
   id: string;
   name: string;
   postId: string | null;
+  postIds?: string[];
   postUrl: string | null;
   pendingNextReel: boolean;
   matchAnyPost: boolean;
@@ -155,7 +156,9 @@ export default function CampaignDetailPage() {
     ? "Any post or reel"
     : campaign.pendingNextReel
       ? "Your next reel"
-      : "A specific post or reel";
+      : (campaign.postIds?.length ?? 0) > 1
+        ? `${campaign.postIds?.length} posts or reels`
+        : "A specific post or reel";
   const matchText = campaign.matchAnyWord
     ? "Any comment"
     : campaign.keywords.join(", ") || "No keywords";
